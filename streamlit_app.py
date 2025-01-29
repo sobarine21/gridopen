@@ -3,52 +3,6 @@ import google.generativeai as genai
 import requests
 import time
 
-# Configure the API keys securely using Streamlit's secrets
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-
-# App Title and Description
-st.title("AI-Powered Ghostwriter")
-st.write("Generate high-quality content and check for originality using the power of Generative AI and Google Search.")
-
-# Initialize session tracking
-initialize_session()
-
-# Prompt Input Field
-prompt = st.text_area("Enter your prompt:", placeholder="Write a blog about AI trends in 2025.")
-
-# Session management to check for block time and session limits
-check_session_limit()
-
-# Generate Content Button
-if st.button("Generate Response"):
-    if not prompt.strip():
-        st.error("Please enter a valid prompt.")
-    else:
-        try:
-            # Generate content using Generative AI
-            generated_text = generate_content(prompt)
-
-            # Increment session count
-            st.session_state.session_count += 1
-
-            # Display the generated content
-            st.subheader("Generated Content:")
-            st.write(generated_text)
-
-            # Check for similar content online
-            st.subheader("Searching for Similar Content Online:")
-            search_results = search_web(generated_text)
-
-            display_search_results(search_results)
-
-        except Exception as e:
-            st.error(f"Error generating content: {e}")
-
-# Display regenerated content if available
-if 'generated_text' in st.session_state:
-    st.subheader("Regenerated Content (After Adjustments for Originality):")
-    st.write(st.session_state.generated_text)
-
 # ---- Helper Functions ----
 
 def initialize_session():
@@ -132,3 +86,51 @@ def regenerate_content(original_content):
     prompt = f"Rewrite the following content to make it original and distinct. Ensure it is paraphrased and does not match existing content:\n\n{original_content}"
     response = model.generate_content(prompt)
     return response.text.strip()
+
+# ---- Main Streamlit App ----
+
+# Configure the API keys securely using Streamlit's secrets
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+
+# App Title and Description
+st.title("AI-Powered Ghostwriter")
+st.write("Generate high-quality content and check for originality using the power of Generative AI and Google Search.")
+
+# Initialize session tracking
+initialize_session()
+
+# Prompt Input Field
+prompt = st.text_area("Enter your prompt:", placeholder="Write a blog about AI trends in 2025.")
+
+# Session management to check for block time and session limits
+check_session_limit()
+
+# Generate Content Button
+if st.button("Generate Response"):
+    if not prompt.strip():
+        st.error("Please enter a valid prompt.")
+    else:
+        try:
+            # Generate content using Generative AI
+            generated_text = generate_content(prompt)
+
+            # Increment session count
+            st.session_state.session_count += 1
+
+            # Display the generated content
+            st.subheader("Generated Content:")
+            st.write(generated_text)
+
+            # Check for similar content online
+            st.subheader("Searching for Similar Content Online:")
+            search_results = search_web(generated_text)
+
+            display_search_results(search_results)
+
+        except Exception as e:
+            st.error(f"Error generating content: {e}")
+
+# Display regenerated content if available
+if 'generated_text' in st.session_state:
+    st.subheader("Regenerated Content (After Adjustments for Originality):")
+    st.write(st.session_state.generated_text)
