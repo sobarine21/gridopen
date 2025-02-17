@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import requests
 import time
-from oauthlib.oauth2 import WebApplicationClient
+from requests_oauthlib import OAuth2Session
 
 # ---- OAuth Configuration ----
 client_id = st.secrets["oauth"]["client_id"]
@@ -105,24 +105,17 @@ def handle_redirect():
     query_params = st.experimental_get_query_params()
     if 'code' in query_params:
         code = query_params['code'][0]
-        client = WebApplicationClient(client_id)
+
+        # OAuth2 session setup
+        oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri)
         
         # Exchange the code for an access token
-        token_response = requests.post(token_url, data={
-            'code': code,
-            'client_id': client_id,
-            'client_secret': client_secret,
-            'redirect_uri': redirect_uri,
-            'grant_type': 'authorization_code',
-        })
-        
-        token_data = token_response.json()
-        access_token = token_data['access_token']
-        
+        token = oauth_session.fetch_token(token_url, client_secret=client_secret, code=code)
+
         # Fetch user info
-        user_info_response = requests.get(api_base_url, headers={'Authorization': f'Bearer {access_token}'})
+        user_info_response = oauth_session.get(api_base_url)
         user_info = user_info_response.json()
-        
+
         # Store user info in session state
         st.session_state.user_info = user_info
         st.write(f"Welcome {user_info.get('displayName')}")
@@ -132,10 +125,12 @@ def handle_redirect():
 
 def login_oauth():
     """Handles OAuth login."""
-    client = WebApplicationClient(client_id)
+    # OAuth2 session setup
+    oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri)
     
     # Generate the authorization URL
-    authorization_url, state = client.authorization_url(auth_base_url, access_type="offline", prompt="select_account")
+    authorization_url, state = oauth_session.authorization_url(auth_base_url, access_type="offline", prompt="select_account")
+    
     st.write(f"Please log in with Google: [Login]({authorization_url})")
 
 # ---- Main Streamlit App ----
