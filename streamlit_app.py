@@ -112,12 +112,9 @@ def handle_redirect():
         try:
             token = oauth_session.fetch_token(token_url, client_secret=client_secret, code=code)
             st.session_state.oauth_token = token  # Save token to session state
+            st.experimental_rerun()  # Rerun to reload page and avoid showing code in URL
         except Exception as e:
             st.error(f"Error exchanging code for token: {e}")
-            return
-        
-        # Redirect (rerun) to avoid showing the `code` in the URL
-        st.rerun()
 
 def login_oauth():
     """Handles OAuth login."""
@@ -143,7 +140,7 @@ def post_to_blogger(content):
     response = requests.get(blogs_url, headers=headers)
     
     if response.status_code == 200:
-        blogs = response.json()['items']
+        blogs = response.json().get('items', [])
         if not blogs:
             st.error("No Blogger blogs found. Please create a blog first.")
             return
