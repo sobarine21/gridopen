@@ -10,7 +10,7 @@ client_secret = st.secrets["oauth"]["client_secret"]
 redirect_uri = "https://gridopen.streamlit.app/"  # Your app's URL (main URL)
 auth_base_url = "https://accounts.google.com/o/oauth2/auth"
 token_url = "https://oauth2.googleapis.com/token"
-api_base_url = "https://www.googleapis.com/plus/v1/people/me"  # To get user information
+api_base_url = "https://www.googleapis.com/plus/v1/people/me"  # To get user information (though we won't use it)
 
 # ---- Helper Functions ----
 
@@ -20,8 +20,6 @@ def initialize_session():
         st.session_state.session_count = 0
     if 'block_time' not in st.session_state:
         st.session_state.block_time = None
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = None  # Store user info after authentication
 
 def check_session_limit():
     """Checks if the user has reached the session limit and manages block time."""
@@ -116,14 +114,6 @@ def handle_redirect():
             st.error(f"Error exchanging code for token: {e}")
             return
         
-        # Fetch user info
-        user_info_response = oauth_session.get(api_base_url)
-        user_info = user_info_response.json()
-
-        # Store user info in session state
-        st.session_state.user_info = user_info
-        st.write(f"Welcome {user_info.get('displayName')}")
-        
         # Redirect (rerun) to avoid showing the `code` in the URL
         st.rerun()
 
@@ -140,15 +130,14 @@ def login_oauth():
 # ---- Main Streamlit App ----
 
 # Check if user is logged in, show login if not
-if 'user_info' not in st.session_state:
-    if 'code' in st.query_params:
-        handle_redirect()
-    else:
-        login_oauth()
+if 'code' in st.query_params:
+    handle_redirect()
+
+if 'user_info' not in st.session_state:  # Not logged in
+    login_oauth()
 else:
     # App Title and Description
     st.title("AI-Powered Ghostwriter")
-    st.write(f"Welcome, {st.session_state['user_info']['displayName']}!")
     st.write("Generate high-quality content and check for originality using the power of Generative AI and Google Search.")
 
     # Initialize session tracking
