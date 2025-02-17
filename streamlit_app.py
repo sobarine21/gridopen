@@ -108,10 +108,14 @@ def handle_redirect():
 
         # OAuth2 session setup
         oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri)
-        
-        # Exchange the code for an access token
-        token = oauth_session.fetch_token(token_url, client_secret=client_secret, code=code)
 
+        # Exchange the code for an access token
+        try:
+            token = oauth_session.fetch_token(token_url, client_secret=client_secret, code=code)
+        except Exception as e:
+            st.error(f"Error exchanging code for token: {e}")
+            return
+        
         # Fetch user info
         user_info_response = oauth_session.get(api_base_url)
         user_info = user_info_response.json()
@@ -126,7 +130,7 @@ def handle_redirect():
 def login_oauth():
     """Handles OAuth login."""
     # OAuth2 session setup
-    oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri)
+    oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri, scope=["openid", "profile", "email"])
     
     # Generate the authorization URL
     authorization_url, state = oauth_session.authorization_url(auth_base_url, access_type="offline", prompt="select_account")
