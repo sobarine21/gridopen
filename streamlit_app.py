@@ -2,6 +2,15 @@ import streamlit as st
 import google.generativeai as genai
 import requests
 import time
+from oauthlib.oauth2 import WebApplicationClient
+
+# ---- OAuth Configuration ----
+client_id = st.secrets["oauth"]["client_id"]
+client_secret = st.secrets["oauth"]["client_secret"]
+redirect_uri = "https://gridopen.streamlit.app/"  # Your app's URL (main URL)
+auth_base_url = "https://accounts.google.com/o/oauth2/auth"
+token_url = "https://oauth2.googleapis.com/token"
+api_base_url = "https://www.googleapis.com/plus/v1/people/me"  # To get user information
 
 # ---- Helper Functions ----
 
@@ -11,6 +20,8 @@ def initialize_session():
         st.session_state.session_count = 0
     if 'block_time' not in st.session_state:
         st.session_state.block_time = None
+    if 'user_info' not in st.session_state:
+        st.session_state.user_info = None  # Store user info after authentication
 
 def check_session_limit():
     """Checks if the user has reached the session limit and manages block time."""
@@ -87,50 +98,95 @@ def regenerate_content(original_content):
     response = model.generate_content(prompt)
     return response.text.strip()
 
+# ---- OAuth Flow Functions ----
+
+def handle_redirect():
+    """Handles the OAuth redirect after the user logs in."""
+    query_params = st.experimental_get_query_params()
+    if 'code' in query_params:
+        code = query_params['code'][0]
+        client = WebApplicationClient(client_id)
+        
+        # Exchange the code for an access token
+        token_response = requests.post(token_url, data={
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code',
+        })
+        
+        token_data = token_response.json()
+        access_token = token_data['access_token']
+        
+        # Fetch user info
+        user_info_response = requests.get(api_base_url, headers={'Authorization': f'Bearer {access_token}'})
+        user_info = user_info_response.json()
+        
+        # Store user info in session state
+        st.session_state.user_info = user_info
+        st.write(f"Welcome {user_info.get('displayName')}")
+        
+        # Redirect (rerun) to avoid showing the `code` in the URL
+        st.experimental_rerun()
+
+def login_oauth():
+    """Handles OAuth login."""
+    client = WebApplicationClient(client_id)
+    
+    # Generate the authorization URL
+    authorization_url, state = client.authorization_url(auth_base_url, access_type="offline", prompt="select_account")
+    st.write(f"Please log in with Google: [Login]({authorization_url})")
+
 # ---- Main Streamlit App ----
 
-# Configure the API keys securely using Streamlit's secrets
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-
-# App Title and Description
-st.title("AI-Powered Ghostwriter")
-st.write("Generate high-quality content and check for originality using the power of Generative AI and Google Search.")
-
-# Initialize session tracking
-initialize_session()
-
-# Prompt Input Field
-prompt = st.text_area("Enter your prompt:", placeholder="Write a blog about AI trends in 2025.")
-
-# Session management to check for block time and session limits
-check_session_limit()
-
-# Generate Content Button
-if st.button("Generate Response"):
-    if not prompt.strip():
-        st.error("Please enter a valid prompt.")
+# Check if user is logged in, show login if not
+if 'user_info' not in st.session_state:
+    if 'code' in st.experimental_get_query_params():
+        handle_redirect()
     else:
-        try:
-            # Generate content using Generative AI
-            generated_text = generate_content(prompt)
+        login_oauth()
+else:
+    # App Title and Description
+    st.title("AI-Powered Ghostwriter")
+    st.write(f"Welcome, {st.session_state['user_info']['displayName']}!")
+    st.write("Generate high-quality content and check for originality using the power of Generative AI and Google Search.")
 
-            # Increment session count
-            st.session_state.session_count += 1
+    # Initialize session tracking
+    initialize_session()
 
-            # Display the generated content
-            st.subheader("Generated Content:")
-            st.write(generated_text)
+    # Prompt Input Field
+    prompt = st.text_area("Enter your prompt:", placeholder="Write a blog about AI trends in 2025.")
 
-            # Check for similar content online
-            st.subheader("Searching for Similar Content Online:")
-            search_results = search_web(generated_text)
+    # Session management to check for block time and session limits
+    check_session_limit()
 
-            display_search_results(search_results)
+    # Generate Content Button
+    if st.button("Generate Response"):
+        if not prompt.strip():
+            st.error("Please enter a valid prompt.")
+        else:
+            try:
+                # Generate content using Generative AI
+                generated_text = generate_content(prompt)
 
-        except Exception as e:
-            st.error(f"Error generating content: {e}")
+                # Increment session count
+                st.session_state.session_count += 1
 
-# Display regenerated content if available
-if 'generated_text' in st.session_state:
-    st.subheader("Regenerated Content (After Adjustments for Originality):")
-    st.write(st.session_state.generated_text)
+                # Display the generated content
+                st.subheader("Generated Content:")
+                st.write(generated_text)
+
+                # Check for similar content online
+                st.subheader("Searching for Similar Content Online:")
+                search_results = search_web(generated_text)
+
+                display_search_results(search_results)
+
+            except Exception as e:
+                st.error(f"Error generating content: {e}")
+
+    # Display regenerated content if available
+    if 'generated_text' in st.session_state:
+        st.subheader("Regenerated Content (After Adjustments for Originality):")
+        st.write(st.session_state.generated_text)
