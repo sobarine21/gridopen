@@ -102,9 +102,9 @@ def regenerate_content(original_content):
 
 def handle_redirect():
     """Handles the OAuth redirect after the user logs in."""
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if 'code' in query_params:
-        code = query_params['code'][0]
+        code = query_params['code']
 
         # OAuth2 session setup
         oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri)
@@ -125,7 +125,7 @@ def handle_redirect():
         st.write(f"Welcome {user_info.get('displayName')}")
         
         # Redirect (rerun) to avoid showing the `code` in the URL
-        st.experimental_rerun()
+        st.rerun()
 
 def login_oauth():
     """Handles OAuth login."""
@@ -141,7 +141,7 @@ def login_oauth():
 
 # Check if user is logged in, show login if not
 if 'user_info' not in st.session_state:
-    if 'code' in st.experimental_get_query_params():
+    if 'code' in st.query_params:
         handle_redirect()
     else:
         login_oauth()
