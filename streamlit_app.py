@@ -10,7 +10,8 @@ client_secret = st.secrets["oauth"]["client_secret"]
 redirect_uri = "https://gridopen.streamlit.app/"  # Your app's URL (main URL)
 auth_base_url = "https://accounts.google.com/o/oauth2/auth"
 token_url = "https://oauth2.googleapis.com/token"
-api_base_url = "https://www.googleapis.com/plus/v1/people/me"  # To get user information (though we won't use it)
+blogger_api_url = "https://www.googleapis.com/blogger/v3/blogs"
+api_base_url = "https://www.googleapis.com/plus/v1/people/me"  # For Google+ (not needed here)
 
 # ---- Helper Functions ----
 
@@ -110,6 +111,7 @@ def handle_redirect():
         # Exchange the code for an access token
         try:
             token = oauth_session.fetch_token(token_url, client_secret=client_secret, code=code)
+            st.session_state.oauth_token = token  # Save token to session state
         except Exception as e:
             st.error(f"Error exchanging code for token: {e}")
             return
@@ -120,12 +122,48 @@ def handle_redirect():
 def login_oauth():
     """Handles OAuth login."""
     # OAuth2 session setup
-    oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri, scope=["openid", "profile", "email"])
+    oauth_session = OAuth2Session(client_id, redirect_uri=redirect_uri, scope=["openid", "profile", "email", "https://www.googleapis.com/auth/blogger"])
     
     # Generate the authorization URL
     authorization_url, state = oauth_session.authorization_url(auth_base_url, access_type="offline", prompt="select_account")
     
     st.write(f"Please log in with Google: [Login]({authorization_url})")
+
+def post_to_blogger(content):
+    """Posts the generated content to the user's Blogger account."""
+    if 'oauth_token' not in st.session_state:
+        st.error("User is not authenticated. Please log in first.")
+        return
+
+    token = st.session_state.oauth_token
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+
+    # Get user's Blogger blogs
+    blogs_url = f"{blogger_api_url}/byowner"
+    response = requests.get(blogs_url, headers=headers)
+    
+    if response.status_code == 200:
+        blogs = response.json()['items']
+        if not blogs:
+            st.error("No Blogger blogs found. Please create a blog first.")
+            return
+        
+        blog_id = blogs[0]['id']  # Pick the first blog
+        post_url = f"{blogger_api_url}/{blog_id}/posts/"
+        
+        # Create the blog post
+        post_data = {
+            "title": "AI Generated Blog Post",
+            "content": content
+        }
+        
+        post_response = requests.post(post_url, json=post_data, headers=headers)
+        if post_response.status_code == 200:
+            st.success("Content has been posted to your Blogger account!")
+        else:
+            st.error(f"Failed to post to Blogger: {post_response.status_code} - {post_response.text}")
+    else:
+        st.error(f"Failed to retrieve blogs: {response.status_code} - {response.text}")
 
 # ---- Main Streamlit App ----
 
@@ -133,7 +171,7 @@ def login_oauth():
 if 'code' in st.query_params:
     handle_redirect()
 
-if 'user_info' not in st.session_state:  # Not logged in
+if 'oauth_token' not in st.session_state:  # Not logged in
     login_oauth()
 else:
     # App Title and Description
@@ -164,6 +202,9 @@ else:
                 # Display the generated content
                 st.subheader("Generated Content:")
                 st.write(generated_text)
+
+                # Post to Blogger
+                post_to_blogger(generated_text)
 
                 # Check for similar content online
                 st.subheader("Searching for Similar Content Online:")
